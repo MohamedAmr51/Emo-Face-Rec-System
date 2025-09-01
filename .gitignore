@@ -14,14 +14,15 @@ Dockerfile
 finalized_model.sav
 Power Bi.pbix
 Trial for csv creation.rar
+Trial for csv creation
+tests/dataset/*.pkl
+tests/*.ipynb
+tests/*.csv
 build/
 dist/
 .mypy_cache/
 .idea/
-tests/dataset/*.pkl
-tests/*.ipynb
-tests/*.csv
 *.pyc
 **/.coverage
 **/.coverage.*
-Trial for csv creation
+
