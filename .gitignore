@@ -1,0 +1,27 @@
+**/__pycache__
+.claude
+**/.DS_Store
+Backup
+envs
+face_recognition_sface
+Models
+Persons_Faces
+simple_predictions
+Try
+deepface_env.yml
+best_model.pth
+Dockerfile
+finalized_model.sav
+Power Bi.pbix
+Trial for csv creation.rar
+build/
+dist/
+.mypy_cache/
+.idea/
+tests/dataset/*.pkl
+tests/*.ipynb
+tests/*.csv
+*.pyc
+**/.coverage
+**/.coverage.*
+Trial for csv creation
