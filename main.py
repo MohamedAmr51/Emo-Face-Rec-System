@@ -26,17 +26,15 @@ accumulated_faces = []  # Global list to accumulate faces across frames
 # new_persons_created = False  # Track if new persons were created
 
 # To set Functions start time
-frame_detect_milli_sec = 80        #receive frames every n milliseconds
 face_rec_sec = 5                    #recognize detected faces every n seconds
 outlier_seconds = 120               #delete outlier people every n seconds
 fer_seconds = 20                   #call FER model every n seconds
 similarity_threshold=0.40           #select similarity threshold for comparison between persons
 outlier_n_photos = 4                #select no. of photos to decide if outlier 
-expand_percent = 20                 #to increase the space around the detected face
 
 # To specify size of faces (width and height for the detected face)
-min_w = 25
-min_h = 25
+min_w = 30
+min_h = 30
 
 # To set zoom intensity 
 zoom_factor = 2
@@ -52,7 +50,7 @@ MA_y = 100
 def create_main_folders():
     """For Creating folder first time"""
     global persons_dir                      # Set to global for assign_faces_to_person func.
-    persons_dir = "Person_Faces"           # Dir to save persons inside it
+    persons_dir = "Persons_Faces"           # Dir to save persons inside it
     if not os.path.exists(persons_dir):
         os.mkdir(persons_dir)
 
@@ -76,7 +74,7 @@ def find_best_matching_person(face_img):
         model_name="Facenet512",        # model name for recognition
         distance_metric="cosine",           
         enforce_detection=False,        # don't raise error if face not detected
-        silent=True,                    # Suppress logs
+        silent=False,                    # Suppress logs
         refresh_database= True
         # detector_backend="retinaface"          # refresh database for new imported faces
     )
@@ -200,74 +198,8 @@ def zoom_crop(img_np):
     zoomed_bgr = cv2.cvtColor(zoomed_np, cv2.COLOR_RGB2BGR)
     return zoomed_bgr
 
+
 while True:
-    start_time = time.perf_counter()
-    last_face_rec_time = start_time
-    last_emo_rec_time = start_time
-    update_time = start_time
-    outliers_time = start_time
-    should_refresh = False
-
-    create_main_folders()
-
-    # Omit input to call default camera
-    streams = [
-    "rtsp://admin:LV@0000@lv@10.10.10.134/onvif/profile2/media.smp",        #Management Floor Cam 1
-    "rtsp://admin:LV@0000@lv@10.10.10.135/onvif/profile2/media.smp",        #Management Floor Cam 2
-    "rtsp://admin:V90@13579@v90@10.30.10.127/onvif/profile2/media.smp",     #Waiting Area 90
-    "rtsp://admin:V90@0000@v90@10.30.10.103/onvif/profile2/media.smp",      #Customer Service 90
-    "rtsp://admin:V90@0000@v90@10.30.10.111/onvif/profile5/media.smp",      #The safe 2
-    "rtsp://admin:V90@0000@v90@10.30.10.117/onvif/profile2/media.smp",      #Entrance Corridor
-    "rtsp://admin:admin@13579@10.10.10.67:554/onvif/profile2/media.smp",    #Garden 8 
-    "rtsp://admin:V90@0000@v90@10.30.10.118/onvif/profile2/media.smp"       #Meeting Room 3
-    ]
-
-    deviceId = streams[1]
-    cap = ThreadedVideoCapture(deviceId)
-    cap.start()
-
-    tm = cv.TickMeter()
-    frame_count = 0 
-
-    while cv.waitKey(frame_detect_milli_sec) < 0:
-        frame = cap.get_frame()
-        if frame is None:
-            print('No frame available!')
-            continue
-
-        frame_count += 1
-        if frame_count % 5 == 0:  # Process every 5th frame
-            continue
-
-        # Inference
-        tm.start()
-        cv.imwrite("test.jpg",frame)
-
-        with contextlib.redirect_stdout(io.StringIO()):
-            results = DeepFace.extract_faces(
-                img_path=frame,
-                detector_backend="mtcnn",
-                enforce_detection=False , 
-                expand_percentage = expand_percent
-            )
-        tm.stop()
-        timestamp = f"{int(time.time())}_{frame_count}"
-        
-        # Accumulate faces across frames for better clustering
-        for idx in range(len(results)):
-            x = results [idx] ["facial_area"]["x"]
-            y = results [idx] ["facial_area"]["y"]
-            w = results [idx] ["facial_area"]["w"]
-            h = results [idx] ["facial_area"]["h"]
-            if w > 0 and h > 0 and w > min_w and h > min_h and results [idx]["confidence"] == 1.00 :
-                face_crop = frame[y:y+h, x:x+w]
-                accumulated_faces.append({
-                    'image': face_crop,
-                    'frame_timestamp': timestamp,
-                    'face_idx': idx,
-                    'frame_count': frame_count
-                })
-        
         current_time = time.perf_counter()
         # Process accumulated faces when counter reaches threshold or we have enough faces
         if  current_time - last_face_rec_time >= face_rec_sec or len(accumulated_faces) >= 100: 
@@ -302,6 +234,5 @@ while True:
 
             last_emo_rec_time = current_time
                 
-        tm.reset()
     
     cap.stop()
