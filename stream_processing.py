@@ -1,11 +1,17 @@
+import io
 import time
 import cv2 as cv
 import contextlib
 from deepface import DeepFace
+from main import accumulated_faces
 from stream_handler import ThreadedVideoCapture
 
-frame_detect_milli_sec = 80        #receive frames every n milliseconds
+frame_detect_milli_sec = 80         #receive frames every n milliseconds
 expand_percent = 20                 #to increase the space around the detected face
+
+# To specify size of faces (width and height for the bounding box of detected face)
+min_w = 30
+min_h = 30
 
 def start_stream(stream):
         cap = ThreadedVideoCapture(stream)
@@ -21,7 +27,7 @@ def start_stream(stream):
             frame_count += 1
             if frame_count % 5 == 0:  # Process every 5th frame
                 continue
-
+            
             # cv.imwrite("test.jpg",frame)
 
             with contextlib.redirect_stdout(io.StringIO()):
@@ -31,7 +37,6 @@ def start_stream(stream):
                     enforce_detection=False , 
                     expand_percentage = expand_percent
                 )
-            tm.stop()
             timestamp = f"{int(time.time())}_{frame_count}"
             
             # Accumulate faces across frames for better clustering
@@ -40,6 +45,7 @@ def start_stream(stream):
                 y = results [idx] ["facial_area"]["y"]
                 w = results [idx] ["facial_area"]["w"]
                 h = results [idx] ["facial_area"]["h"]
+
                 if w > 0 and h > 0 and w > min_w and h > min_h and results [idx]["confidence"] == 1.00 :
                     face_crop = frame[y:y+h, x:x+w]
                     accumulated_faces.append({
@@ -48,5 +54,3 @@ def start_stream(stream):
                         'face_idx': idx,
                         'frame_count': frame_count
                     })
-            
-    return 

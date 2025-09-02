@@ -1,15 +1,11 @@
 import os
 import sys
 import cv2 as cv
-import io
 import csv
 import glob
 import time
 import shutil
 import random
-import argparse
-import contextlib
-import threading
 import numpy as np
 import pandas as pd
 import cv2.data
@@ -18,11 +14,10 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from deepface import DeepFace
 from collections import Counter
-from stream_handler import ThreadedVideoCapture
 from emo_rec import process_emotions_all_temp_folders
 
-
-accumulated_faces = []  # Global list to accumulate faces across frames
+accumulated_faces = []          # Global list to accumulate faces across frames
+accumulated_faces_copy = []     # List to store temp faces for recognition
 # new_persons_created = False  # Track if new persons were created
 
 # To set Functions start time
@@ -32,25 +27,10 @@ fer_seconds = 20                   #call FER model every n seconds
 similarity_threshold=0.40           #select similarity threshold for comparison between persons
 outlier_n_photos = 4                #select no. of photos to decide if outlier 
 
-# To specify size of faces (width and height for the detected face)
-min_w = 30
-min_h = 30
-
-# To set zoom intensity 
-zoom_factor = 2
-
-# 90st Waiting Area
-WA_x = 250
-WA_y = 50
-
-# Management Area
-MA_x = 150 
-MA_y = 100
-
 def create_main_folders():
     """For Creating folder first time"""
     global persons_dir                      # Set to global for assign_faces_to_person func.
-    persons_dir = "Persons_Faces"           # Dir to save persons inside it
+    persons_dir = "Persons_Faces_G8"           # Dir to save persons inside it
     if not os.path.exists(persons_dir):
         os.mkdir(persons_dir)
 
@@ -66,18 +46,22 @@ def delete_outliers():
             continue
 
 def find_best_matching_person(face_img):
-
-    # Use DeepFace.find
-    results = DeepFace.find(
-        img_path=face_img,              # input face image
-        db_path=persons_dir,            # database directory
-        model_name="Facenet512",        # model name for recognition
-        distance_metric="cosine",           
-        enforce_detection=False,        # don't raise error if face not detected
-        silent=False,                    # Suppress logs
-        refresh_database= True
-        # detector_backend="retinaface"          # refresh database for new imported faces
-    )
+    try:
+        # Use DeepFace.find
+        results = DeepFace.find(
+            img_path=face_img,              # input face image
+            db_path=persons_dir,            # database directory
+            model_name="Facenet512",        # model name for recognition
+            detector_backend="mtcnn",       # model name for detection
+            distance_metric="cosine",           
+            enforce_detection=True,        # raise error if face not detected
+            silent=True,                    # Suppress logs
+            refresh_database= True
+            # detector_backend="retinaface"          # refresh database for new imported faces
+        )
+    except Exception as e:
+        print(f"No Face Detected. {e}")
+        return "NO_FACE_DETECTED", -1
     # Handle the results - DeepFace returns a list of DataFrames
     if not results or len(results) == 0:
         return None, 0
@@ -127,6 +111,9 @@ def assign_faces_to_persons(accumulated_faces):
     
         # Find best matching person
         matched_person, similarity = find_best_matching_person(face_image)
+        if matched_person == "NO_FACE_DETECTED":
+                print("Skipping image - no face detected")
+                continue  # Skip to next iteration
         print ("Matched Person:",matched_person,"Similarity:",similarity)
         
         if matched_person:
@@ -134,9 +121,7 @@ def assign_faces_to_persons(accumulated_faces):
             person_folder = os.path.join(persons_dir, matched_person)
             temp_folder = os.path.join(person_folder, "temp")
         else:
-            # Create new person
-            global new_persons_created 
-            new_persons_created = True  
+            # Create new person 
             matched_person = f"person_{next_person_id}"
             existing_persons.add(next_person_id)  
             person_folder = os.path.join(persons_dir, matched_person)
@@ -164,56 +149,29 @@ def assign_faces_to_persons(accumulated_faces):
         temp_face_filename = f"{temp_folder}/face_{face_data['face_idx']}_{face_data['frame_timestamp']}.jpg"
         cv.imwrite(temp_face_filename, face_image)
 
-def zoom_crop(img_np):
-    """
-    Zoom into a manually defined region in the image.
-    Input: img_np = OpenCV image (NumPy array, BGR)
-    Returns: zoomed image as NumPy array (still in BGR for OpenCV)
-    """
-    # Convert BGR (OpenCV) to RGB (PIL expects RGB)
-    img_rgb = cv2.cvtColor(img_np, cv2.COLOR_BGR2RGB)
-
-    # Convert to PIL Image
-    img = Image.fromarray(img_rgb)
-
-    w, h = img.size
-    # ==================================
-
-    crop_w = w // zoom_factor
-    crop_h = h // zoom_factor
-
-    end_x = min(WA_x + crop_w, w)
-    end_y = min(WA_y + crop_h, h)
-
-    box = (WA_x, WA_y, end_x, end_y)
-    cropped = img.crop(box)
-
-    # Resize back to original size
-    zoomed = cropped.resize((w, h), Image.LANCZOS)
-
-    # Convert back to NumPy (RGB)
-    zoomed_np = np.array(zoomed)
-
-    # Convert RGB back to BGR for OpenCV
-    zoomed_bgr = cv2.cvtColor(zoomed_np, cv2.COLOR_RGB2BGR)
-    return zoomed_bgr
-
-
 while True:
+        start_time = time.perf_counter()
+        last_face_rec_time = start_time
+        last_emo_rec_time = start_time
+        outliers_time = start_time
+
         current_time = time.perf_counter()
         # Process accumulated faces when counter reaches threshold or we have enough faces
-        if  current_time - last_face_rec_time >= face_rec_sec or len(accumulated_faces) >= 100: 
+        if  current_time - last_face_rec_time >= face_rec_sec or len(accumulated_faces) >= 40: 
             elapsed_time = current_time - last_face_rec_time
             print(f"face_rec loop started after {elapsed_time:.2f} seconds")
 
             if accumulated_faces:
                 print(f"Processing {len(accumulated_faces)} accumulated faces...")
 
+                accumulated_faces_copy = accumulated_faces.copy()
+                accumulated_faces.clear()
+
                 # Assign faces to persons 
-                assign_faces_to_persons(accumulated_faces)
+                assign_faces_to_persons(accumulated_faces_copy)
                 
                 # Clear accumulated faces after assignment
-                accumulated_faces.clear()
+                accumulated_faces_copy.clear()
 
             last_face_rec_time = current_time
         

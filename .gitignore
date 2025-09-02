@@ -6,6 +6,7 @@ envs
 face_recognition_sface
 Emo Models
 Persons_Faces
+Persons_Faces_G8
 simple_predictions
 Try
 deepface_env.yml
