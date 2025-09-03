@@ -7,7 +7,9 @@ face_recognition_sface
 Emo Models
 Persons_Faces
 Persons_Faces_G8
+Persons_Temp_G8
 simple_predictions
+simple_predictions_old_10.135
 Try
 deepface_env.yml
 best_model.pth
