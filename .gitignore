@@ -6,6 +6,9 @@ envs
 face_recognition_sface
 Emo Models
 Persons_Faces
+Persons_Faces_G8/
+Persons_Temp_G8/
+simple_predictions_old_10.135/
 simple_predictions
 Try
 deepface_env.yml
@@ -26,3 +29,5 @@ dist/
 **/.coverage
 **/.coverage.*
 
+Quality Assessment/insightface/model/insightface-0000.params
+Quality Assessment/CR-FIQAL/181952backbone.pth
