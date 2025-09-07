@@ -12,10 +12,6 @@ import torch.nn.functional as F
 from collections import Counter
 import torchvision.transforms as transforms
 
-
-global  persons_dir
-persons_dir = "Person_Faces"
-
 # Emotions labels
 emotions = ['happy', 'surprise', 'sad', 'anger', 'disgust', 'fear', 'neutral']
 people_name = { 
@@ -30,7 +26,7 @@ people_name = {
         }
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-filename = 'D:\\Mohamed\\Desktop\\deep_face\\finalized_model.sav'
+filename = 'finalized_model.sav'
 loaded_model = pickle.load(open(filename, 'rb'))
 fer_simple_results = []
 
@@ -62,9 +58,9 @@ def detect_emotion(image):
         'neutral_prob': rounded_scores[6]
     }
 
-def process_emotions_all_temp_folders():
+def process_emotions_all_temp_folders(persons_temp_dir , persons_dir):
     """Process emotions for all person temp folders"""
-    if not os.path.exists(persons_dir):
+    if not os.path.exists(persons_temp_dir) or not os.path.exists(persons_dir):
         return
     
     for person_folder in os.listdir(persons_dir):
@@ -72,10 +68,12 @@ def process_emotions_all_temp_folders():
             continue
             
         person_path = os.path.join(persons_dir, person_folder)
-        if len(os.listdir(person_path)) < 5 :
+        person_temp_path = os.path.join(persons_temp_dir,person_folder)
+
+        if len(os.listdir(person_path)) < 4 :
             continue 
 
-        temp_path = os.path.join(person_path, "temp")
+        temp_path = os.path.join(person_temp_path, "temp")
 
         if not os.path.exists(temp_path):
             continue
@@ -180,7 +178,7 @@ def append_simple_csv_records(fer_simple_results):
        print("No simple results to append")
        return
     try:
-        simple_csv_filename = 'C:\\Users\\Admin.Amr\\OneDrive - Misr Italia properties\\G8 Fer\\simple_fer_results.csv'
+        simple_csv_filename = 'simple_fer_results.csv'              #'C:\\Users\\Admin.Amr\\OneDrive - Misr Italia properties\\G8 Fer\\simple_fer_results.csv'
         file_exists = os.path.exists(simple_csv_filename)
 
         # Convert new results to DataFrame
