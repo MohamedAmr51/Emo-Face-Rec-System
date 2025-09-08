@@ -18,13 +18,14 @@ from stream_processing import stream_worker
 # ]
 
 class MultiStreamProcessor:
-    def __init__(self, streams, max_queue_size=500):
+    def __init__(self, streams, max_queue_size=500 , filtered_images_path = "Quality Assessment\\data\\filtered_aligned_images_quality"):
         self.streams = streams
         self.max_queue_size = max_queue_size
         self.processes = []
         self.face_queue = mp.Queue(maxsize=max_queue_size)
         self.stop_event = mp.Event()
-        
+        self.filtered_images_path = filtered_images_path
+
         # Setup signal handling for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -61,7 +62,18 @@ class MultiStreamProcessor:
         while (len(faces_batch) < max_batch_size and 
                time.time() - start_time < timeout):
             try:
-                face_data = self.face_queue.get(timeout=0.1)
+                for filename in os.listdir(self.filtered_images_path):
+                    if filename.endswith(".jpg"):
+                    img_path = os.path.join(filtered_images_path,filename)
+                    img = cv.imread(img_path)
+                face_data = {
+                                'image': face_crop,
+                                'frame_timestamp': timestamp,
+                                'face_idx': idx,
+                                'frame_count': frame_count,
+                                'worker_id':worker_id,
+                                'stream':stream
+                            }
                 faces_batch.append(face_data)
             except:
                 break
