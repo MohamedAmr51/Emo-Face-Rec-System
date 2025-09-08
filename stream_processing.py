@@ -1,4 +1,5 @@
 import io
+import os
 import time
 import cv2 as cv
 import contextlib
@@ -11,6 +12,18 @@ expand_percent = 20                 #to increase the space around the detected f
 # To specify size of faces (width and height for the bounding box of detected face)
 min_w = 40
 min_h = 40
+
+# Folder path for quality model
+quality_path = "Quality Assessment\\data\\Detected Faces\\New folder"
+
+def save_image(face_data):
+    """
+    Save the image face into the quality folder for quality checking and alignment
+    """
+
+    os.makedirs(quality_path, exist_ok=True)
+    face_filename = f"{quality_path}\\face_{face_data['face_idx']}_{face_data['frame_timestamp']}.jpg"
+    cv.imwrite(face_filename, face_data['image'])
 
 def stream_worker(stream , face_queue , worker_id , stop_event):
         print(f"Worker {worker_id} starting for stream: {stream}")
@@ -59,11 +72,7 @@ def stream_worker(stream , face_queue , worker_id , stop_event):
                                 'stream':stream
                             }
 
-                            # Put face data in queue (non-blocking)
-                            try:
-                                face_queue.put(face_data, block=False)
-                            except:
-                                print(f"Worker {worker_id}: Queue full, skipping face")
+                            save_image(face_data)
 
                 except Exception as e:
                     print(f"Worker {worker_id}: Error processing frame: {e}")
