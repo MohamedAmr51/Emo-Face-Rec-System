@@ -55,7 +55,7 @@ class MultiStreamProcessor:
         
     def get_faces_batch(self, max_batch_size=50, timeout=1.0):
         """
-        Get a batch of faces from the queue
+        Get a batch of faces from the queue folder
         Returns list of face data dictionaries
         """
         faces_batch = []
@@ -86,7 +86,7 @@ class MultiStreamProcessor:
         
     def get_queue_size(self):
         """Get current queue size"""
-        return self.face_queue.qsize()
+        return len(os.listdir(self.filtered_images_path))
         
     def stop(self):
         """Stop all worker processes"""
