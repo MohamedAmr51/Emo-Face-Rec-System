@@ -20,7 +20,7 @@ def save_image(face_data):
     """
     Save the image face into the quality folder for quality checking and alignment
     """
-
+  
     os.makedirs(quality_path, exist_ok=True)
     face_filename = f"{quality_path}\\face_{face_data['face_idx']}_{face_data['frame_timestamp']}.jpg"
     cv.imwrite(face_filename, face_data['image'])
@@ -68,8 +68,7 @@ def stream_worker(stream , face_queue , worker_id , stop_event):
                                 'frame_timestamp': timestamp,
                                 'face_idx': idx,
                                 'frame_count': frame_count,
-                                'worker_id':worker_id,
-                                'stream':stream
+                                'worker_id':worker_id
                             }
 
                             save_image(face_data)
