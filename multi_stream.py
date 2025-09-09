@@ -4,6 +4,8 @@ import signal
 import sys
 from queue import Empty
 from stream_processing import stream_worker
+import cv2 as cv
+import os 
 
 # # Omit input to call default camera
 # streams_G8_zone = [
@@ -64,15 +66,17 @@ class MultiStreamProcessor:
             try:
                 for filename in os.listdir(self.filtered_images_path):
                     if filename.endswith(".jpg"):
-                    img_path = os.path.join(filtered_images_path,filename)
-                    img = cv.imread(img_path)
+                        img_path = os.path.join(self.filtered_images_path,filename)
+                        img = cv.imread(img_path)
+                        parts = filename.replace('.jpg', '').split("_")
+
                 face_data = {
-                                'image': face_crop,
-                                'frame_timestamp': timestamp,
-                                'face_idx': idx,
-                                'frame_count': frame_count,
-                                'worker_id':worker_id,
-                                'stream':stream
+                            'image': img,
+                            "face_quality":float(parts[1]),
+                            'face_idx': int(parts[3]),
+                            'frame_timestamp': parts[4],
+                            'frame_count': int(parts[5]),
+                            'worker_id': int(parts[6])
                             }
                 faces_batch.append(face_data)
             except:
