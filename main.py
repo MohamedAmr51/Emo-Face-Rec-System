@@ -9,8 +9,9 @@ import random
 import numpy as np
 import pandas as pd
 import cv2.data
-from PIL import Image
 import matplotlib.pyplot as plt
+
+from PIL import Image
 from datetime import datetime
 from deepface import DeepFace
 from collections import Counter
@@ -20,8 +21,8 @@ from multi_stream import MultiStreamProcessor
 
 accumulated_faces = []          # Global list to accumulate faces across frames
 accumulated_faces_copy = []     # List to store temp faces for recognition
-# new_persons_created = False  # Track if new persons were created
 
+# Directories to save persons
 global persons_dir , persons_temp_dir       # Set to global for assign_faces_to_person func.
 persons_dir = "Persons_Faces_G8"            # Dir to save persons inside it
 persons_temp_dir = "Persons_Temp_G8"
@@ -181,7 +182,7 @@ def assign_faces_to_persons(accumulated_faces):
         
         # Save face image to person folder 
         if len(os.listdir(person_folder)) < 290:
-            face_filename = f"{person_folder}/face_{face_data['face_idx']}_{face_data['frame_timestamp']}.jpg"
+            face_filename = f"{person_folder}/quality_{face_data['face_quality']}_face_{face_data['face_idx']}_{face_data['frame_timestamp']}.jpg"
             cv.imwrite(face_filename, face_image)
         
         # Save copy to temp folder (for emotion analysis)
