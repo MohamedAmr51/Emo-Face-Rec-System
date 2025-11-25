@@ -62,12 +62,8 @@ def move_failed_to_aligned(from_folder):
         shutil.copy(f"{from_folder}/{filename}", f"{to_folder}/{filename}")
         print(f"Copied {filename}")
 
-def align_faces_gpu(in_folder,out_folder,gpu):
-    # in_folder = "data\\Failed detected images"      # path to input images
-    # out_folder = r"data\\aligned_for_failed"        # path to save aligned images
-    # gpu = 0                                         # GPU ID (use -1 for CPU)
+def align_faces_gpu(in_folder,out_folder,gpu):                                       
 
     align_images(in_folder, out_folder, gpu)
-
     move_failed_to_aligned(f"{out_folder}\\New folder")
 

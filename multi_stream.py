@@ -70,15 +70,16 @@ class MultiStreamProcessor:
                         img = cv.imread(img_path)
                         parts = filename.replace('.jpg', '').split("_")
 
-                face_data = {
-                            'image': img,
-                            "face_quality":float(parts[1]),
-                            'face_idx': int(parts[3]),
-                            'frame_timestamp': parts[4],
-                            'frame_count': int(parts[5]),
-                            'worker_id': int(parts[6])
-                            }
-                faces_batch.append(face_data)
+                    face_data = {
+                                'image': img,
+                                "face_quality":float(parts[1]),
+                                'face_idx': int(parts[3]),
+                                'frame_timestamp': parts[4],
+                                'frame_count': int(parts[5]),
+                                'worker_id': int(parts[6])
+                                }
+                    faces_batch.append(face_data)
+                    os.remove(img_path)
             except:
                 break
                 

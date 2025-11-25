@@ -14,8 +14,12 @@ import torchvision.transforms as transforms
 
 # Emotions labels
 emotions = ['happy', 'surprise', 'sad', 'anger', 'disgust', 'fear', 'neutral']
-people_name = { 
-        'person_0':'Eyad Masoud', 
+people_name = {
+        }
+
+people_name_G8 = {
+        'person_0':'Eyad Masoud',
+        'person_1':'Khaled Mahmoud', 
         'person_3':'Habiba Gharabawy',
         'person_6':'Abdelrahman Azabawy',
         'person_7':'Zeyad El-Sheikh',
@@ -23,7 +27,9 @@ people_name = {
         'person_14':'Hala Refaey',
         'person_17':'Helen Bakhoum',
         'person_43':'Mohamed Tawfeek'
-        }
+}
+
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 filename = 'finalized_model.sav'
@@ -178,7 +184,7 @@ def append_simple_csv_records(fer_simple_results):
        print("No simple results to append")
        return
     try:
-        simple_csv_filename = 'simple_fer_results.csv'              #'C:\\Users\\Admin.Amr\\OneDrive - Misr Italia properties\\G8 Fer\\simple_fer_results.csv'
+        simple_csv_filename = 'C:\\Users\\Admin.Amr\\OneDrive - Misr Italia properties\\G8 Fer\\simple_fer_results_90st.csv'
         file_exists = os.path.exists(simple_csv_filename)
 
         # Convert new results to DataFrame

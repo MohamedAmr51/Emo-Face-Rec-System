@@ -1,10 +1,127 @@
 import argparse
 import os
 import sys
+import time
+import shutil 
+import subprocess
 
 from evaluation.QualityModel import QualityModel
+from utils.serfiq_example import align_faces_cpu 
+from utils.MTCNN_alignment_fast import align_faces_gpu
 
+# Quality model initialization
+face_model = QualityModel("./CR-FIQAL", "181952", 0)
 
+# Paths for moving quality images
+txt_file = "data\\quality_data\\custom_dataset\\custom_quality_scores.txt"   # Your text file
+source_folder = r"data\\aligned faces"                                       # Folder where the images actually are
+destination_folder = r"data\\filtered_aligned_images_quality"                # Folder where renamed copies will go
+
+# Paths for image preprocessing
+faces_dir = "data\\Detected Faces\\New folder"
+in_folder = "data\\Failed detected images"      # path to input images
+out_folder = r"data\\aligned_for_failed"        # path to save aligned images
+
+wait_time = 10     # n seconds to check the raw faces folder
+gpu = 0
+processed_files = set()
+
+def delete_leftovers(custom_data_dir):
+    """
+    Delete any failed detection failed faces in faces_dir 
+    Clean in , out folder
+    """
+    faces_dir_files = os.listdir(faces_dir)
+    for filename in os.listdir(in_folder):
+        if filename in faces_dir_files:
+            path_to_delete = os.path.join(faces_dir, filename)
+            os.remove(path_to_delete)
+
+    # Clear folders after quality detection
+    try:
+        shutil.rmtree(in_folder)
+    except Exception as e:
+        print(f"Error clearing {in_folder}: {e}")
+
+    try:
+        shutil.rmtree(out_folder)
+    except Exception as e:
+        print(f"Error clearing {out_folder}: {e}")
+
+        # Delete custom data folder
+    try:
+        shutil.rmtree(custom_data_dir)
+    except Exception as e:
+        print(f"\nError clearing {custom_data_dir}: {e}")
+    
+    try:
+        shutil.rmtree(source_folder)
+    except Exception as e:
+        print(f"Error clearing {source_folder}: {e}")
+
+    print("\nCleared leftovers.")
+    
+def has_new_images():
+    global processed_files
+    
+    if not os.path.exists(faces_dir):
+        return False
+    
+    # Get all image files in the directory
+    current_files = set()
+    for file in os.listdir(faces_dir):
+        if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+            current_files.add(file)
+    
+    new_files = current_files - processed_files
+    
+    if new_files:
+        processed_files.update(new_files)
+        print(f"Found {len(new_files)} new images")
+        return True
+    return False
+
+def move_quality_images(path_list_file):
+    # Make sure destination folder exists
+    os.makedirs(destination_folder, exist_ok=True)
+
+    # Read text file line by line
+    with open(txt_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Split into filepath and score
+            filepath, score = line.rsplit(" ", 1)
+            score = float(score)  # Convert to float for formatting
+            filename = os.path.basename(filepath)  # Extract filename only
+            
+            # Source file path (from source_folder)
+            source_path = os.path.join(source_folder, filename)
+
+            if score >= 1.98 :
+                # New filename with score
+                new_filename = f"quality_{score:.4f}_{filename}"  # Keep 4 decimals
+                new_path = os.path.join(destination_folder, new_filename)
+
+                source_path = os.path.join(source_folder, filename)
+                
+                try:
+                    # Copy file if exists
+                    if os.path.exists(source_path):
+                        shutil.copy2(source_path, new_path)
+
+                except Exception as e:
+                    print(f"⚠️ File not found: {source_path} , Error: {e}")
+
+            delete_path = os.path.join(faces_dir , filename)
+
+            if os.path.exists(delete_path):
+                os.remove(delete_path)
+    
+    delete_leftovers(path_list_file)
+    
 def parse_arguments(argv):
     parser = argparse.ArgumentParser()
 
@@ -30,7 +147,6 @@ def parse_arguments(argv):
 
     return parser.parse_args(argv)
 
-
 def read_image_list(image_list_file, image_dir=''):
     image_lists = []
     absolute_list = []
@@ -50,51 +166,53 @@ def read_image_list(image_list_file, image_dir=''):
     return image_lists, absolute_list
 
 d_data_dir = "data"
+
 def main(param):
     datasets = param.datasets.split(',')
+    print("Starting continuous monitoring...")
     
-    print(f"Initializing quality model from: {param.model_path}")
-    # QualityModel expects: model_prefix, model_epoch, gpu_id
-    face_model = QualityModel(param.model_path, param.model_id, param.gpu_id)
-    
-    for dataset in datasets:
-        print(f"\nProcessing dataset: {dataset}")
+    while True:  # Infinite monitoring loop
         
-        # Paths for your data
-        dataset_dir = os.path.join(param.data_dir, dataset)
-        image_list_file = os.path.join(dataset_dir, 'image_path_list.txt')
-        
-        if not os.path.exists(image_list_file):
-            print(f"Error: {image_list_file} not found!")
-            continue
+        # Step 1: Check if there are new raw images to process
+        if has_new_images():  # Check your input folders
+            print("New raw images detected, starting preprocessing...")
             
-        # Read image list
-        image_list, absolute_list = read_image_list(image_list_file, d_data_dir)
-        
-        print(f"Getting quality scores for {len(image_list)} images...")
-        
-        # Get embeddings and quality scores
-        embedding, quality = face_model.get_batch_feature(
-            image_list, 
-            batch_size=16, 
-            color=param.color_channel
-        )
-        
-        # Ensure output directory exists
-        output_dir = os.path.join(param.data_dir, dataset)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        
-        # Write quality scores
-        quality_file_path = os.path.join(output_dir, param.score_file_name)
-        print(f"Writing quality scores to: {quality_file_path}")
-        
-        with open(quality_file_path, "w") as quality_score:  # Changed from "a" to "w"
-            for i in range(len(quality)):
-                quality_score.write(f"{absolute_list[i]} {quality[i][0]}\n")
-        
-        print(f"Quality assessment complete! Results saved to {quality_file_path}")
+            # Step 2: Face alignment (your essential steps)
+            align_faces_cpu(faces_dir)
+            align_faces_gpu(in_folder, out_folder, gpu)
+            
+            # Step 3: Extract and prepare data structure  
+            subprocess.run(["python", "fixed_extract.py"])
+            
+            # Step 4: Quality assessment on the newly prepared data
+            for dataset in datasets:
+                dataset_dir = os.path.join(param.data_dir, dataset)
+                image_list_file = os.path.join(dataset_dir, 'image_path_list.txt')
+                
+                if os.path.exists(image_list_file):
+                    print(f"Running quality assessment on {dataset}...")
+                    
 
+                    image_list, absolute_list = read_image_list(image_list_file, d_data_dir)
+                    embedding, quality = face_model.get_batch_feature(image_list, batch_size=16, color=param.color_channel)
+                    
+                    output_dir = os.path.join(param.data_dir, dataset)
+                    if not os.path.exists(output_dir):
+                        os.makedirs(output_dir)
+
+                    # Save results
+                    quality_file_path = os.path.join(dataset_dir, param.score_file_name)
+                    with open(quality_file_path, "w") as quality_score:
+                        for i in range(len(quality)):
+                            quality_score.write(f"{absolute_list[i]} {quality[i][0]}\n")
+                    
+                    print(f"Quality assessment complete! Results saved to {quality_file_path}")
+
+                    move_quality_images(dataset_dir)
+        else:
+            print("No new raw images found, waiting...")
+            
+        time.sleep(wait_time)  # Wait for n seconds before next check
 
 if __name__ == '__main__':
     main(parse_arguments(sys.argv[1:]))
