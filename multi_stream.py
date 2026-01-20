@@ -1,3 +1,17 @@
+"""
+Multiprocessing Stream Handler Module.
+
+This module implements a scalable 'Producer' architecture for video ingestion.
+It is designed to decouple video decoding (IO-bound/CPU-bound) from the main
+application logic to prevent frame drops and latency.
+
+Key Components:
+    - MultiStreamProcessor: Manages a pool of worker processes, one for each RTSP stream.
+    - Inter-Process Communication (IPC): Uses `multiprocessing.Queue` (or file buffers)
+      to safely transmit detected face crops from workers to the main process.
+    - Graceful Shutdown: Handles signal interception (SIGINT) to ensure all child
+      processes are terminated correctly.
+"""
 import multiprocessing as mp
 import time
 import signal
@@ -6,18 +20,6 @@ from queue import Empty
 from stream_processing import stream_worker
 import cv2 as cv
 import os 
-
-# # Omit input to call default camera
-# streams_G8_zone = [
-# "rtsp://admin:LV@0000@lv@10.10.10.134/onvif/profile2/media.smp",            #Management Floor Cam 1
-# "rtsp://admin:LV@0000@lv@10.10.10.135/onvif/profile2/media.smp"             #Management Floor Cam 2
-# # "rtsp://admin:V90@13579@v90@10.30.10.127/onvif/profile2/media.smp",       #Waiting Area 90
-# # "rtsp://admin:V90@0000@v90@10.30.10.103/onvif/profile2/media.smp",        #Customer Service 90
-# # "rtsp://admin:V90@0000@v90@10.30.10.111/onvif/profile5/media.smp",        #The safe 2
-# # "rtsp://admin:V90@0000@v90@10.30.10.117/onvif/profile2/media.smp",        #Entrance Corridor
-# # "rtsp://admin:admin@13579@10.10.10.67:554/onvif/profile2/media.smp",      #Garden 8 
-# # "rtsp://admin:V90@0000@v90@10.30.10.118/onvif/profile2/media.smp"         #Meeting Room 3
-# ]
 
 class MultiStreamProcessor:
     def __init__(self, streams, max_queue_size=500 , filtered_images_path = "Quality Assessment\\data\\filtered_aligned_images_quality"):

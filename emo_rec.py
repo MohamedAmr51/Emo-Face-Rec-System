@@ -1,3 +1,21 @@
+"""
+Emotion Analysis Engine.
+
+This module processes batches of face images to detect emotions using a pre-trained CNN.
+
+Features:
+    - Batch Processing: Iterates through temporary folders containing face crops for each person.
+    - Emotion Detection: Runs inference on each individual face image.
+    - Logging: Appends the detection results (emotion, confidence, probabilities) for *every* face 
+      to a CSV file for downstream analysis.
+    - File Management: Moves processed images to a 'predictions' folder for review.
+
+Model:
+    - Architecture: ResEmoteNet (Bridging Accuracy and Loss Reduction in Facial Emotion Recognition).
+      Reference: https://arxiv.org/abs/2409.10545
+    - Dataset: Trained on a custom subset of AffectNet (37,303 images) from Kaggle.
+    - Classes: 7 (happy, surprise, sad, anger, disgust, fear, neutral).
+"""
 import numpy as np 
 import cv2 as cv
 from PIL import Image
@@ -14,21 +32,12 @@ import torchvision.transforms as transforms
 
 # Emotions labels
 emotions = ['happy', 'surprise', 'sad', 'anger', 'disgust', 'fear', 'neutral']
+
+# Dictionary to map person IDs to real names for CSV reporting.
+# Use this to replace 'person_ID' if you want specific names in the output.
 people_name = {
+        #'person_0':'John Doe'
         }
-
-people_name_G8 = {
-        'person_0':'Eyad Masoud',
-        'person_1':'Khaled Mahmoud', 
-        'person_3':'Habiba Gharabawy',
-        'person_6':'Abdelrahman Azabawy',
-        'person_7':'Zeyad El-Sheikh',
-        'person_8':'Mohamed Fahmy',
-        'person_14':'Hala Refaey',
-        'person_17':'Helen Bakhoum',
-        'person_43':'Mohamed Tawfeek'
-}
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -44,6 +53,16 @@ transform = transforms.Compose([
 ])
 
 def detect_emotion(image):
+    """
+    Perform inference on a single face image using the loaded PyTorch model.
+    
+    Args:
+        image: PIL Image object (grayscale).
+        
+    Returns:
+        dict: Contains the 'detected_emotion', 'confidence_score', and
+              individual probabilities for all 7 emotions.
+    """
     img_tensor = transform(image).unsqueeze(0).to(device)
     with torch.no_grad():
         outputs = loaded_model(img_tensor)
@@ -65,7 +84,19 @@ def detect_emotion(image):
     }
 
 def process_emotions_all_temp_folders(persons_temp_dir , persons_dir):
-    """Process emotions for all person temp folders"""
+    """
+    Batch process all temporary face images.
+    
+    Workflow:
+    1. Scans `persons_temp_dir` for folders containing face crops.
+    2. Filters folders that have enough images (min 4).
+    3. Runs `detect_emotion` on each face crop individually.
+    4. Filters out specific negative emotions (fear, anger, disgust) from the *file system* 
+       (removes them from processing list) but logs others.
+    5. Maps 'surprise' -> 'happy'.
+    6. Appends the result for EACH face to a CSV file.
+    7. Moves processed images to a `simple_predictions` folder.
+    """
     if not os.path.exists(persons_temp_dir) or not os.path.exists(persons_dir):
         return
     
@@ -168,7 +199,12 @@ def process_emotions_all_temp_folders(persons_temp_dir , persons_dir):
         print("No faces accumulated to process.")
 
 def extract_face_timestamp(face_file): # used to extract timestamp from image path
-    """Extract and convert Unix timestamp from face filename"""
+    """
+    Extract and convert Unix timestamp from face filename.
+    
+    Format expected: face_{idx}_{timestamp}_{count}.jpg
+    Example: face_0_1753018669_3929.jpg -> 1753018669 -> '2025-07-21 14:37:49'
+    """
     # face_0_1753018669_3929.jpg -> extract 1753018669
     parts = face_file.split('_')
     if len(parts) >= 3:
@@ -184,7 +220,7 @@ def append_simple_csv_records(fer_simple_results):
        print("No simple results to append")
        return
     try:
-        simple_csv_filename = 'C:\\Users\\Admin.Amr\\OneDrive - Misr Italia properties\\G8 Fer\\simple_fer_results_90st.csv'
+        simple_csv_filename = 'emotion_results.csv'
         file_exists = os.path.exists(simple_csv_filename)
 
         # Convert new results to DataFrame
@@ -192,11 +228,9 @@ def append_simple_csv_records(fer_simple_results):
 
         # Save the data with proper quoting
         new_df.to_csv(simple_csv_filename , mode='a' , header=not file_exists, index=False, quoting=csv.QUOTE_NONNUMERIC)
-        print(f"Appended to simple CSV file with {len(new_df)} records")
+        print(f"Appended to the CSV file with {len(new_df)} records")
 
     except Exception as e:
-        print(f"Error appending to Simple CSV: {e}")
+        print(f"Error appending to CSV: {e}")
     
     return
-
-# process_emotions_all_temp_folders()

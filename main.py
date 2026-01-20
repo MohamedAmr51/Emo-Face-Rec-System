@@ -21,43 +21,36 @@ from contextlib import redirect_stdout, redirect_stderr
 from multi_stream import MultiStreamProcessor
 
 accumulated_faces = []          # Global list to accumulate faces across frames
-accumulated_faces_copy = []     # List to store temp faces for recognition
 
 # Directories to save persons
 global persons_dir , persons_temp_dir       # Set to global for assign_faces_to_person func.
-persons_dir = "Persons_Faces_90st"            # Dir to save persons inside it
-persons_temp_dir = "Persons_Temp_90st"
+persons_dir = "Persons_Faces"               # Dir to save the person's recognition set
+persons_temp_dir = "Persons_Temp"           # Dir to save the person's temp set for emotional detection
+
+# ==========================================
+# 1. Modifiable Parameters & Configuration
+# ==========================================
+# These parameters control the system's sensitivity, timing, and model choices.
 
 # To set Functions start time
-face_rec_sec = 5                                    #recognize detected faces every n seconds
-outlier_seconds = 120                                #delete outlier people every n seconds
-fer_seconds = 30                                    #call FER model every n seconds
-similarity_threshold=0.4554                         #select similarity threshold for comparison between persons
-outlier_n_photos = 4                                #select no. of photos to decide if outlier 
+face_rec_sec = 5                                    # Interval (seconds) to run face recognition on accumulated faces
+fer_seconds = 30                                    # Interval (seconds) to run Emotion Recognition on temp folders
+similarity_threshold=0.4554                         # Cosine similarity threshold for ArcFace. Lower = stricter matching.
+outlier_n_photos = 4                                # Min photos to keep a person folder. Variant based on detection/save frequency.
+outlier_seconds = 120                               # Interval (seconds) to prune noise persons. Variant based on detection/save frequency.
+max_person_photos = 290                             # Max photos to keep a person folder. Variant based on detection/save frequency.
 
-#DeepFace Parameters
-face_recognition_model="ArcFace"
-metric="cosine"
-face_detection_model= "mtcnn"
-expand_percent=0
-alignment=True
-norm="base"
-
-finished_persons = []
-finished_persons_G8 = [
-                    'person_0',
-                    'person_1',
-                    'person_6',
-                    'person_7',
-                    'person_8',
-                    'person_14',
-                    'person_17',
-                    'person_43'
-]
+# DeepFace Model Parameters
+face_recognition_model="ArcFace"                    # Model used for generating face embeddings
+metric="cosine"                                     # Distance metric for comparing embeddings
+face_detection_model= "mtcnn"                       # Detector used by DeepFace (though a custom MTCNN is used in workers)
+expand_percent=0                                    # Percentage to expand the bounding box
+alignment=True                                      # Whether to align faces (eyes horizontally) before recognition
+norm="base"                                         # Normalization technique for input images
 
 
 def create_main_folders():
-    """For Creating folder first time"""
+    """For Creating folders first time"""
 
     if not os.path.exists(persons_dir):
         os.mkdir(persons_dir)
@@ -66,7 +59,19 @@ def create_main_folders():
         os.mkdir(persons_temp_dir)
 
 def delete_outliers():
-    """Deleting the person folder if length of folder less than the required length"""
+    """
+    2. Outlier Deletion Function
+    
+    Periodically cleans up the 'Persons' directory to remove noise.
+    
+    Logic:
+    - Iterates through all persons folders.
+    - If a folder has fewer images than `outlier_n_photos` (e.g., 4), it is considered
+      a false positive or a transient detection (someone walking by too fast).
+    - Deletes both the main person folder and their corresponding temp folder.
+    
+    This prevents the system from accumulating thousands of "junk" identities over time.
+    """
     for person_id in os.listdir(persons_dir):
         person_folder = os.path.join(persons_dir,person_id)
         try:
@@ -79,9 +84,16 @@ def delete_outliers():
             continue
 
 def deepface_find(face_img):
+    """
+    ===========================================================================
+    NOTE: This function is primarily used to REFRESH the DeepFace database.
+    By calling DeepFace.find with refresh_database=True, we ensure that the 
+    internal embeddings representations are updated with any new person 
+    folders or images added since the last run.
+    ===========================================================================
+    """
     with open(os.devnull, 'w') as devnull:
         with redirect_stdout(devnull), redirect_stderr(devnull):
-    # Use DeepFace.find() instead of manual comparison
             result = DeepFace.find(
                 img_path=face_img,                              # input face image
                 db_path=persons_dir,                            # database directory
@@ -95,10 +107,22 @@ def deepface_find(face_img):
     return result
 
 def find_best_matching_person(face_img):
-    try:
-        # with open(os.devnull, 'w') as devnull:
-        #     with redirect_stdout(devnull), redirect_stderr(devnull):
+    """
+    Core recognition logic using DeepFace.
+    
+    Args:
+        face_img: The face image to recognize.
         
+    Returns:
+        tuple: (person_id, similarity_score) or (None, 0) if no match found.
+        
+    Logic:
+    1. Calls `DeepFace.find` to compare the input image against the entire database (`persons_dir`).
+    2. Uses 'ArcFace' model and 'cosine' distance.
+    3. If a match is found, it checks if the similarity score is above our threshold.
+    4. Returns the ID of the best match.
+    """
+    try:
         results = DeepFace.find(
             img_path=face_img,                          # input face image
             db_path=persons_dir,                        # database directory
@@ -139,8 +163,24 @@ def find_best_matching_person(face_img):
 
 def assign_faces_to_persons(accumulated_faces):
     """
-    Assign faces to existing persons or create new ones
-    Replaces the cluster_faces function
+    4. Assign Faces to Persons (Clustering Logic)
+    
+    This function processes a batch of faces and decides whether they belong to an
+    existing person or if a new identity should be created.
+    
+    Args:
+        accumulated_faces: List of face data dictionaries (image, metadata).
+        
+    Logic:
+    1. Iterates through each face in the batch.
+    2. Calls `find_best_matching_person` to see if it matches anyone in the DB.
+    3. If Match Found:
+       - Adds the image to that person's folder.
+    4. If No Match:
+       - Creates a NEW person ID (e.g., person_101).
+       - Creates new folders for this person.
+    5. Also saves a copy to a 'temp' folder for Emotion Analysis.
+    6. Updates the DeepFace database incrementally.
     """
     # Get next available person ID
     existing_persons = set()
@@ -196,7 +236,7 @@ def assign_faces_to_persons(accumulated_faces):
         os.makedirs(temp_folder, exist_ok=True)
         
         # Save face image to person folder 
-        if len(os.listdir(person_folder)) < 290 and matched_person not in finished_persons :
+        if len(os.listdir(person_folder)) < max_person_photos :
             face_filename = f"{person_folder}/quality_{face_data['face_quality']}_face_{face_data['face_idx']}_{face_data['frame_timestamp']}_{face_data['frame_count']}_{face_data['worker_id']}.jpg"
             cv.imwrite(face_filename, face_image)
         
@@ -212,14 +252,28 @@ def assign_faces_to_persons(accumulated_faces):
             print(f"DB not updated successfully , {e}")
 
 def main():
-    """Main processing loop with queue-based multi-stream processing"""
+    """
+    5. Main Processing Loop
+    
+    The central control loop of the application.
+    
+    Workflow:
+    1. Configures RTSP streams.
+    2. Starts the `MultiStreamProcessor` (background workers).
+    3. Enters an infinite loop:
+       - Checks the queue size.
+       - If enough time passed (5s) OR queue is full:
+         -> Pulls a batch of faces.
+         -> Runs `assign_faces_to_persons` (Recognition).
+       - If 120s passed:
+         -> Runs `delete_outliers` (Maintenance).
+       - If 30s passed:
+         -> Runs `process_emotions_all_temp_folders` (Analytics).
+    """
     
     # RTSP streams configuration
     streams = [
-        # "rtsp://admin:LV@0000@lv@10.10.10.134/onvif/profile2/media.smp",  # Management Floor Cam 1
-        # "rtsp://admin:LV@0000@lv@10.10.10.135/onvif/profile2/media.smp"   # Management Floor Cam 2
-        "rtsp://service:V90%230000%23v90@10.30.10.128/onvif/profile2/media.smp"
-        # Add more streams as needed
+        # Add your RTSP streams here
     ]
     
     # Initialize folders
@@ -266,7 +320,7 @@ def main():
                 print(f"\nDeleting outliers after {current_time - outliers_time:.1f} seconds")
                 delete_outliers()
                 print("Outlier deletion completed")
-                outliers_time = current_time
+                outliers_time = current_time # Reset timer
             
             # Process emotions periodically
             if current_time - last_emo_rec_time >= fer_seconds:
@@ -277,7 +331,7 @@ def main():
                 except Exception as e:
                     print(f"Error during emotion processing: {e}")
                 
-                last_emo_rec_time = current_time
+                last_emo_rec_time = current_time # Reset timer
             
             # Short sleep to prevent busy waiting
             time.sleep(0.5)

@@ -1,47 +1,38 @@
-# Author: Jan Niklas Kolf, 2020
+"""
+CPU-based Face Alignment Utility.
+
+This module provides functions to align faces using the SER-FIQ wrapper (likely wrapping MTCNN)
+running on the CPU. It is used as a fallback or alternative to the GPU-based alignment.
+
+Key Features:
+- Iterates through a directory of raw face images.
+- Aligns faces and saves them to a structured directory.
+- Handles failures by moving problematic images to a separate folder.
+"""
 from utils.face_image_quality import SER_FIQ
 import cv2
 import os 
 import numpy as np
 from tqdm import tqdm
 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
-#Variables for sending the email
-From = "Tempforbluestacks70@gmail.com"
-To = ["Mohamed.ElSayed@misritaliaproperties.com" , "mohamedamr485@gmail.com"]
-Username ="Tempforbluestacks70@gmail.com"
-Userpassword="xwcppwquwscnablc"
-Server = "smtp.gmail.com"
-Port = 587
-
-def SendMail(text , Subject):
-    
-    Text = f"{text}"
-    msg = MIMEMultipart()
-    msg['Subject'] = Subject
-    msg['From'] = From
-    msg['To'] = ", ".join(To)
-    mime_text = MIMEText(Text)
-    msg.attach(mime_text)
-
-    s = smtplib.SMTP(Server,Port)
-    s.starttls()
-    try:
-        s.login(Username, Userpassword)
-        s.sendmail(From, To, msg.as_string())
-        print("Email Was Sent Successfully !")
-        s.quit()
-    except smtplib.SMTPAuthenticationError:
-        print("UserName or Password are incorrect.")
-
 def align_faces_cpu(faces_dir):
+    """
+    Align faces in a directory using the CPU.
+    
+    Args:
+        faces_dir (str): Directory containing raw face images.
+        
+    Workflow:
+    1. Initializes SER_FIQ model (CPU mode).
+    2. Creates output directories for aligned and failed images.
+    3. Iterates through `faces_dir`.
+    4. Aligns each image.
+    5. Saves successful alignments to `data/aligned faces`.
+    6. Moves failed alignments to `data/Failed detected images/New folder`.
+    """
     # Create the SER-FIQ Model
     ser_fiq = SER_FIQ(gpu=None)
     
-    # faces_dir = "data\\original images\\New folder"
     os.makedirs("data\\Failed detected images\\New folder",exist_ok=True)
     os.makedirs("data\\aligned faces",exist_ok=True)
 

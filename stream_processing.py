@@ -1,3 +1,17 @@
+"""
+Individual Stream Worker Logic.
+
+This module defines the workload for a single camera process. It runs in an isolated
+process space to ensure that a laggy camera stream does not block the entire system.
+
+Responsibilities:
+    1.  Connect to an RTSP stream using a threaded buffer (to minimize I/O blocking).
+    2.  Perform Face Detection on selected frames using MTCNN.
+    3.  Filter detections based on confidence and size constraints.
+    4.  Save high-quality face crops to the shared buffer for the main process to consume.
+
+Note: This module focuses on *Detection* only. Recognition is offloaded to `main.py`.
+"""
 import io
 import os
 import time

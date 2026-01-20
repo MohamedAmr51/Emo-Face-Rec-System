@@ -1,3 +1,14 @@
+"""
+Data Preparation Helper for Quality Assessment.
+
+This script prepares aligned face images for the CR-FIQA quality assessment model.
+It acts as a bridge between the alignment step and the scoring step.
+
+Key Functions:
+1.  **Color Conversion**: Converts BGR images (OpenCV default) to RGB (Model requirement).
+2.  **File Organization**: Copies images to a structured directory (`data/quality_data/custom_dataset`).
+3.  **List Generation**: Creates `image_path_list.txt` and `pair_list.txt` required by the model's dataloader.
+"""
 import os
 import cv2
 
@@ -17,9 +28,16 @@ if not os.path.exists(outpath):
 # Since you have individual images, not organized by person folders
 align_path = path  # Points directly to your aligned faces folder
 
-
 def copy_img(img_filename):
-    """Copy and convert image from BGR to RGB format"""
+    """
+    Copy and convert an image from BGR to RGB format.
+    
+    Args:
+        img_filename (str): Name of the file in the aligned faces directory.
+        
+    Returns:
+        str: The filename if successful, None otherwise.
+    """
     src_path = os.path.join(align_path, img_filename)
     if not os.path.exists(src_path):
         print(f"Warning: Image {src_path} not found")
@@ -39,7 +57,15 @@ def copy_img(img_filename):
 
 
 def create_image_list_from_custom_dataset():
-    """Create image list from your custom aligned face dataset"""
+    """
+    Create the necessary image list and pair list files for the dataset.
+    
+    This function:
+    1. Scans the aligned faces directory.
+    2. Calls `copy_img` for each file to convert and move it.
+    3. Writes the relative paths to `image_path_list.txt`.
+    4. Generates dummy pairs in `pair_list.txt` (required by the model loader).
+    """
     
     # Get all image files from your aligned faces folder
     image_files = [f for f in os.listdir(align_path) 

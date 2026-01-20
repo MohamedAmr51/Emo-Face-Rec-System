@@ -1,3 +1,17 @@
+"""
+Continuous Face Quality Assessment Engine.
+
+This module implements a real-time monitoring system that filters face images based on quality.
+It uses the CR-FIQA (Face Image Quality Assessment) model to assign a score to each face.
+
+Workflow:
+1.  **Monitor**: Watches `data/Detected Faces/New folder` for new images.
+2.  **Align**: Uses MTCNN (GPU/CPU) to align faces.
+3.  **Prepare**: Calls `fixed_extract.py` to convert and list images.
+4.  **Score**: Runs CR-FIQA inference to get a quality score (0-100+).
+5.  **Filter**: Moves high-quality images (score >= 1.98) to `filtered_aligned_images_quality`.
+6.  **Cleanup**: Removes processed and low-quality images to maintain a clean state.
+"""
 import argparse
 import os
 import sys
@@ -28,8 +42,16 @@ processed_files = set()
 
 def delete_leftovers(custom_data_dir):
     """
-    Delete any failed detection failed faces in faces_dir 
-    Clean in , out folder
+    Clean up temporary files and folders after a processing batch.
+    
+    Args:
+        custom_data_dir (str): Path to the custom dataset directory to remove.
+        
+    Removes:
+    - Failed detection images.
+    - Intermediate alignment folders.
+    - The temporary custom dataset folder used for scoring.
+    - The source aligned faces folder.
     """
     faces_dir_files = os.listdir(faces_dir)
     for filename in os.listdir(in_folder):
@@ -62,6 +84,12 @@ def delete_leftovers(custom_data_dir):
     print("\nCleared leftovers.")
     
 def has_new_images():
+    """
+    Check if there are new images in the monitored directory.
+    
+    Returns:
+        bool: True if new images are found, False otherwise.
+    """
     global processed_files
     
     if not os.path.exists(faces_dir):
@@ -82,6 +110,16 @@ def has_new_images():
     return False
 
 def move_quality_images(path_list_file):
+    """
+    Filter and move images based on their quality score.
+    
+    Reads the generated score file, checks if the score meets the threshold (>= 1.98),
+    and if so, renames and moves the file to the destination folder.
+    Finally, calls `delete_leftovers` to clean up.
+    
+    Args:
+        path_list_file (str): Path to the directory containing the score file.
+    """
     # Make sure destination folder exists
     os.makedirs(destination_folder, exist_ok=True)
 
@@ -123,6 +161,7 @@ def move_quality_images(path_list_file):
     delete_leftovers(path_list_file)
     
 def parse_arguments(argv):
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--data-dir', type=str, default='/data/quality_data',
@@ -148,6 +187,7 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 def read_image_list(image_list_file, image_dir=''):
+    """Read the list of images to process from a text file."""
     image_lists = []
     absolute_list = []
     
@@ -165,9 +205,13 @@ def read_image_list(image_list_file, image_dir=''):
     print(f"Found {len(image_lists)} images to process")
     return image_lists, absolute_list
 
-d_data_dir = "data"
-
 def main(param):
+    """
+    Main execution loop.
+    
+    Continuously monitors for new images, runs alignment, extraction, and quality scoring.
+    """
+    d_data_dir = "data"
     datasets = param.datasets.split(',')
     print("Starting continuous monitoring...")
     

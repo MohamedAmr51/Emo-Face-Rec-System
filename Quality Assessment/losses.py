@@ -10,13 +10,6 @@ def l2_norm(input, axis = 1):
 
     return output
 
-
-
-
-
-
-
-
 class CR_FIQA_LOSS(nn.Module):
     r"""Implement of ArcFace:
         Args:
